@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { PoseLandmarker, FaceLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
+import { PoseLandmarker, FaceLandmarker, ImageClassifier, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
 import './App.css';
+
+// Note: tf and tflite are loaded via CDN in index.html for better compatibility with Vite
 
 function App() {
   const videoRef = useRef(null);
@@ -9,23 +11,35 @@ function App() {
   const [faceLandmarker, setFaceLandmarker] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cameraActive, setCameraActive] = useState(false);
+  const [specsClassifier, setSpecsClassifier] = useState(null);
+  const [specsLoading, setSpecsLoading] = useState(false);
+  const [visionResolver, setVisionResolver] = useState(null);
   const [resultsDisplay, setResultsDisplay] = useState([]);
   const [debugStatus, setDebugStatus] = useState("Initializing...");
+  const cropCanvasRef = useRef(null);
+  const lastClassifyTimeRef = useRef({});
+  const specsResultsRef = useRef({});
+  const [emotionLoading, setEmotionLoading] = useState(false);
+  const emotionClassifierRef = useRef(null); // use Ref for detection loop to avoid closure staleness
+  const emotionResultsRef = useRef({});
 
   const drawingUtilsRef = useRef(null);
   const requestRef = useRef(null);
   const lastVideoTimeRef = useRef(-1);
+  const lastEmotionClassifyTimeRef = useRef({});
 
   // Load MediaPipe Models
   useEffect(() => {
     const createModels = async () => {
       try {
         setDebugStatus("Loading Vision Tasks...");
+        console.log("Step 1: Initializing FilesetResolver");
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
         );
 
         setDebugStatus("Loading Pose Model...");
+        console.log("Step 2: Loading PoseLandmarker");
         const pose = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
@@ -33,13 +47,11 @@ function App() {
           },
           runningMode: "VIDEO",
           numPoses: 5,
-          minPoseDetectionConfidence: 0.85,
-          minPosePresenceConfidence: 0.85,
-          minTrackingConfidence: 0.85,
         });
         setPoseLandmarker(pose);
 
         setDebugStatus("Loading Face Model...");
+        console.log("Step 3: Loading FaceLandmarker");
         const face = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
@@ -48,17 +60,40 @@ function App() {
           outputFaceBlendshapes: true,
           runningMode: "VIDEO",
           numFaces: 5,
-          minFaceDetectionConfidence: 0.7,
-          minFacePresenceConfidence: 0.7,
-          minTrackingConfidence: 0.7
         });
         setFaceLandmarker(face);
 
+        setVisionResolver(vision); // Keep for on-demand tools
+        console.log("Step 4: Core Vision Ready.");
+
+        // Auto-load Specs Classifier
+        const specs = await ImageClassifier.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite`,
+            delegate: "GPU"
+          },
+          maxResults: 5,
+          runningMode: "IMAGE"
+        });
+        setSpecsClassifier(specs);
+        console.log("Step 5: Specs Classifier Active.");
+
+        // Auto-load Emotion CPU Model (High Compatibility)
+        setDebugStatus("Loading Emotion Model...");
+        window.tflite.setWasmPath('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.7/dist/');
+        const response = await fetch('/models/emotion_model.tflite');
+        const blob = await response.blob();
+        const modelUrl = URL.createObjectURL(blob);
+        const eModel = await window.tflite.loadTFLiteModel(modelUrl, { numThreads: 1 });
+        emotionClassifierRef.current = eModel;
+        URL.revokeObjectURL(modelUrl);
+        console.log("Step 6: FER+ Emotion Active.");
+
         setLoading(false);
-        setDebugStatus("Models Ready. Start Camera.");
+        setDebugStatus("System Ready.");
       } catch (error) {
-        console.error("Error loading MediaPipe:", error);
-        setDebugStatus("Error: " + error.message);
+        console.error("Initialization Error:", error);
+        setDebugStatus("System Error: " + error.message);
       }
     };
 
@@ -87,6 +122,11 @@ function App() {
       });
   };
 
+  const startCamera = () => {
+    setCameraActive(true);
+    enableCam();
+  };
+
   const calculateAngle = (a, b, c) => {
     if (!a || !b || !c) return 0;
     const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
@@ -97,47 +137,23 @@ function App() {
 
   const colors = ["#38bdf8", "#f472b6", "#34d399", "#fbbf24", "#a78bfa"];
 
+  /* 
+   * EMOTION DETECTION LOGIC
+   * Model: MediaPipe Face Landmarker (Blendshapes)
+   * We map 52 facial muscle parameters to 7 basic emotions + Confusion.
+   */
   const analyzeFace = (blendshapes) => {
-    // Logic for "Confused"
-    // Features: Asymmetric brows, brow furrow (inner up/down), squinting
+    const categories = blendshapes.categories;
+    const score = (name) => categories.find(b => b.categoryName === name)?.score || 0;
 
-    const brands = blendshapes.categories;
-    const getScore = (name) => brands.find(b => b.categoryName === name)?.score || 0;
+    // --- MediaPipe Logic (Fallback) ---
+    const browDown = (score('browDownLeft') + score('browDownRight')) / 2;
+    const eyeWide = (score('eyeWideLeft') + score('eyeWideRight')) / 2;
+    const squint = (score('eyeSquintLeft') + score('eyeSquintRight')) / 2;
 
-    const browInnerUp = getScore('browInnerUp');
-    const browDownLeft = getScore('browDownLeft');
-    const browDownRight = getScore('browDownRight');
-    const browOuterUpLeft = getScore('browOuterUpLeft');
-    const browOuterUpRight = getScore('browOuterUpRight');
-    const eyeSquintLeft = getScore('eyeSquintLeft');
-    const eyeSquintRight = getScore('eyeSquintRight');
-    const jawOpen = getScore('jawOpen');
-    const mouthSmile = (getScore('mouthSmileLeft') + getScore('mouthSmileRight')) / 2;
-
-    // 1. Asymmetry (One brow raised)
-    const browAsymmetry = Math.abs(browOuterUpLeft - browOuterUpRight);
-
-    // 2. Furrow (Brows down or inner up + squint)
-    const furrowScore = (browDownLeft + browDownRight + browInnerUp) / 3;
-    const squintScore = (eyeSquintLeft + eyeSquintRight) / 2;
-
-    let emotion = "Neutral";
-    let confidence = 0;
-
-    // Confusion Heuristic
-    if (browAsymmetry > 0.4) {
-      emotion = "Confused? (Brow)";
-      confidence = browAsymmetry;
-    } else if (furrowScore > 0.5 && squintScore > 0.3 && mouthSmile < 0.2) {
-      emotion = "Confused (Furrow)";
-      confidence = furrowScore;
-    } else if (mouthSmile > 0.5) {
-      emotion = "Happy";
-    } else if (jawOpen > 0.5) {
-      emotion = "Surprised";
-    }
-
-    return emotion;
+    return {
+      isSquinting: squint > 0.3,
+    };
   };
 
   const analyzePose = (landmarks) => {
@@ -201,12 +217,14 @@ function App() {
         // Map Faces to Poses
         // We'll simplisticly match Face Center to Pose Nose
         const faces = faceResults.faceBlendshapes.map((shapes, i) => {
-          // Calculate simplistic center from landmarks if needed, 
-          // but here we just have blendshapes and landmarks.
-          // Let's use landmark 1 (nose tip) from faceResults.faceLandmarks
           const landmarks = faceResults.faceLandmarks[i];
           const nose = landmarks ? landmarks[1] : { x: 0, y: 0 };
-          return { id: i, nose, emotion: analyzeFace(shapes) };
+          const faceAnalysis = analyzeFace(shapes);
+
+          // Use FER+ if available, otherwise hide emotion
+          const mappedEmotion = emotionResultsRef.current[i] || "---";
+
+          return { id: i, nose, emotion: mappedEmotion, isSquinting: faceAnalysis.isSquinting };
         });
 
         if (poseResults.landmarks && poseResults.landmarks.length > 0) {
@@ -217,9 +235,11 @@ function App() {
             const poseData = analyzePose(landmarks);
 
             // Find matching face
-            // Find face closest to pose nose (landmarks[0])
             let assignedEmotion = "Scanning...";
-            let minDist = 0.2; // Threshold for matching (normalized coords)
+            let isSquinting = false;
+            let matchedFaceLandmarks = null;
+            let matchedFaceId = null;
+            let minDist = 0.2;
 
             if (poseData.nose && faces.length > 0) {
               faces.forEach(face => {
@@ -230,18 +250,102 @@ function App() {
                 if (dist < minDist) {
                   minDist = dist;
                   assignedEmotion = face.emotion;
+                  isSquinting = face.isSquinting;
+                  matchedFaceLandmarks = faceResults.faceLandmarks[face.id];
+                  matchedFaceId = face.id;
                 }
               });
             }
 
+            // 1. Prepare Face Crop for AI (Specs + Emotion)
+            const now = performance.now();
+            let isWearingSpecs = false; // Reset by default for each person
+
+            // Check if we have a cached result for THIS specific face
+            if (matchedFaceId !== null && specsResultsRef.current[matchedFaceId] !== undefined) {
+              isWearingSpecs = specsResultsRef.current[matchedFaceId];
+            }
+
+            if (matchedFaceLandmarks) {
+              const cropCtx = cropCanvasRef.current.getContext('2d');
+              let minX = 1, minY = 1, maxX = 0, maxY = 0;
+              matchedFaceLandmarks.forEach(l => {
+                if (l.x < minX) minX = l.x; if (l.y < minY) minY = l.y;
+                if (l.x > maxX) maxX = l.x; if (l.y > maxY) maxY = l.y;
+              });
+
+              const w = maxX - minX;
+              const h = maxY - minY;
+              const pad = 0.10; // Tightened crop for better Specs/FER focus
+              const sx = Math.max(0, (minX - w * pad) * video.videoWidth);
+              const sy = Math.max(0, (minY - h * pad) * video.videoHeight);
+              const sw = Math.min(video.videoWidth - sx, (w * (1 + 2 * pad)) * video.videoWidth);
+              const sh = Math.min(video.videoHeight - sy, (h * (1 + 2 * pad)) * video.videoHeight);
+
+              // Update the crop for ALL detectors
+              cropCtx.clearRect(0, 0, 224, 224);
+              cropCtx.drawImage(video, sx, sy, sw, sh, 0, 0, 224, 224);
+
+              // 2. Specs Detection (Slow Throttle: 800ms)
+              if (specsClassifier && matchedFaceId !== null && (!lastClassifyTimeRef.current[matchedFaceId] || now - lastClassifyTimeRef.current[matchedFaceId] > 800)) {
+                lastClassifyTimeRef.current[matchedFaceId] = now;
+                const classificationResult = specsClassifier.classify(cropCanvasRef.current);
+                const topCategory = classificationResult.classifications[0].categories[0];
+                console.log(`[Specs Insight] Face ${matchedFaceId}: Top Guess = "${topCategory.categoryName}" (Conf: ${topCategory.score.toFixed(2)})`);
+
+                if (classificationResult && classificationResult.classifications && classificationResult.classifications.length > 0) {
+                  isWearingSpecs = classificationResult.classifications[0].categories.some(cat =>
+                    ['spectacle', 'specs', 'eyeglasses', 'sunglass', 'sunglasses'].some(s =>
+                      cat.categoryName.toLowerCase().includes(s)
+                    )
+                  );
+                  specsResultsRef.current[matchedFaceId] = isWearingSpecs;
+                }
+              }
+
+              // Emotion Detection (FER+ 64x64 Grayscale) - Runs independently of the specs throttle
+              if (emotionClassifierRef.current && matchedFaceLandmarks && matchedFaceId !== null && (!lastEmotionClassifyTimeRef.current[matchedFaceId] || now - lastEmotionClassifyTimeRef.current[matchedFaceId] > 100)) {
+                lastEmotionClassifyTimeRef.current[matchedFaceId] = now;
+                try {
+                  window.tf.tidy(() => {
+                    const faceTensor = window.tf.browser.fromPixels(cropCanvasRef.current)
+                      .resizeNearestNeighbor([48, 48]) // FER+ size
+                      .mean(2) // Grayscale
+                      .expandDims(-1)
+                      .toFloat()
+                      .div(window.tf.scalar(255.0))
+                      .expandDims(0);
+
+                    const prediction = emotionClassifierRef.current.predict(faceTensor);
+                    const data = prediction.dataSync();
+
+                    const labels = ['Neutral', 'Happy', 'Surprise', 'Sad', 'Angry', 'Disgust', 'Fear', 'Contempt'];
+                    const emojiMap = {
+                      'Neutral': '😐', 'Happy': '😊', 'Surprise': '😲', 'Sad': '😢',
+                      'Angry': '😠', 'Disgust': '🤢', 'Fear': '😨', 'Contempt': '😒'
+                    };
+
+                    let maxIdx = 0;
+                    for (let j = 1; j < data.length; j++) {
+                      if (data[j] > data[maxIdx]) maxIdx = j;
+                    }
+
+                    const label = labels[maxIdx] || 'Neutral';
+
+                    // Save cleaned label without prefix or emoji
+                    emotionResultsRef.current[matchedFaceId] = label;
+                  });
+                } catch (e) {
+                  console.error("FER+ Real-time Error:", e);
+                }
+              }
+            }
+
             // 1. Draw
             drawingUtilsRef.current.drawLandmarks(landmarks, {
-              radius: (data) => DrawingUtils.lerp(data.from.z, -0.15, 0.1, 5, 1),
-              color: "white",
-              lineWidth: 2
             });
             drawingUtilsRef.current.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-              color: personColor, // Match ID color
+              color: personColor,
               lineWidth: 4
             });
 
@@ -249,7 +353,9 @@ function App() {
               id: index + 1,
               color: personColor,
               ...poseData,
-              emotion: assignedEmotion
+              emotion: assignedEmotion,
+              isSquinting: isSquinting,
+              specs: isWearingSpecs
             });
           });
           setDebugStatus(`Detecting: ${poseResults.landmarks.length} Person(s)`);
@@ -287,10 +393,22 @@ function App() {
 
       {!cameraActive && !loading && (
         <div className="loading" style={{ background: 'transparent', backdropFilter: 'blur(10px)' }}>
-          <h1>Pose + Emotion AI</h1>
-          <button className="btn" onClick={enableCam}>
-            Start Camera
+          <button
+            className="start-button"
+            onClick={startCamera}
+          >
+            Start System
           </button>
+        </div>
+      )}
+
+      {cameraActive && !emotionClassifierRef.current && emotionLoading && (
+        <div style={{
+          position: 'absolute', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 1000, color: 'gold', fontWeight: 'bold', textShadow: '0 0 5px black'
+        }}>
+          <div className="spinner" style={{ width: '20px', height: '20px', display: 'inline-block', marginRight: '10px' }}></div>
+          Initializing FER+ Model...
         </div>
       )}
 
@@ -325,12 +443,26 @@ function App() {
             <div className="status-row">
               <span className="label">Emotion</span>
               <span className="value" style={{ color: '#fbbf24' }}>
-                {person.emotion}
+                {person.emotion || "Scanning"}
+              </span>
+            </div>
+            <div className="status-row">
+              <span className="label">Specs</span>
+              <span className="value" style={{ color: person.specs ? '#a7f3d0' : '#94a3b8' }}>
+                {person.specs ? 'Detected' : 'None'}
+              </span>
+            </div>
+            <div className="status-row">
+              <span className="label">Eye Strain</span>
+              <span className="value" style={{ color: person.isSquinting ? '#f87171' : '#94a3b8' }}>
+                {person.isSquinting ? 'Strain Detected' : 'Comfortable'}
               </span>
             </div>
           </div>
         ))}
       </div>
+      {/* Hidden canvas for face classification */}
+      <canvas ref={cropCanvasRef} width={224} height={224} style={{ display: 'none' }} />
     </div>
   );
 }
