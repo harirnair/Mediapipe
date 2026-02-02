@@ -33,13 +33,11 @@ function App() {
     const createModels = async () => {
       try {
         setDebugStatus("Loading Vision Tasks...");
-        console.log("Step 1: Initializing FilesetResolver");
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
         );
 
         setDebugStatus("Loading Pose Model...");
-        console.log("Step 2: Loading PoseLandmarker");
         const pose = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
@@ -51,7 +49,6 @@ function App() {
         setPoseLandmarker(pose);
 
         setDebugStatus("Loading Face Model...");
-        console.log("Step 3: Loading FaceLandmarker");
         const face = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
@@ -64,7 +61,6 @@ function App() {
         setFaceLandmarker(face);
 
         setVisionResolver(vision); // Keep for on-demand tools
-        console.log("Step 4: Core Vision Ready.");
 
         // Auto-load Specs Classifier
         const specs = await ImageClassifier.createFromOptions(vision, {
@@ -76,7 +72,6 @@ function App() {
           runningMode: "IMAGE"
         });
         setSpecsClassifier(specs);
-        console.log("Step 5: Specs Classifier Active.");
 
         // Auto-load Emotion CPU Model (High Compatibility)
         setDebugStatus("Loading Emotion Model...");
@@ -87,7 +82,6 @@ function App() {
         const eModel = await window.tflite.loadTFLiteModel(modelUrl, { numThreads: 1 });
         emotionClassifierRef.current = eModel;
         URL.revokeObjectURL(modelUrl);
-        console.log("Step 6: FER+ Emotion Active.");
 
         setLoading(false);
         setDebugStatus("System Ready.");
@@ -146,13 +140,16 @@ function App() {
     const categories = blendshapes.categories;
     const score = (name) => categories.find(b => b.categoryName === name)?.score || 0;
 
-    // --- MediaPipe Logic (Fallback) ---
+    // --- MediaPipe Logic (Direct Analysis) ---
     const browDown = (score('browDownLeft') + score('browDownRight')) / 2;
     const eyeWide = (score('eyeWideLeft') + score('eyeWideRight')) / 2;
     const squint = (score('eyeSquintLeft') + score('eyeSquintRight')) / 2;
+    const browInnerUp = score('browInnerUp');
+    const browAsymmetry = Math.abs(score('browOuterUpLeft') - score('browOuterUpRight'));
 
     return {
       isSquinting: squint > 0.3,
+      isConfused: (browInnerUp > 0.25 && browDown > 0.15) || (browAsymmetry > 0.15)
     };
   };
 
@@ -224,12 +221,18 @@ function App() {
           // Use FER+ if available, otherwise hide emotion
           const mappedEmotion = emotionResultsRef.current[i] || "---";
 
-          return { id: i, nose, emotion: mappedEmotion, isSquinting: faceAnalysis.isSquinting };
+          return {
+            id: i,
+            nose,
+            emotion: mappedEmotion,
+            isSquinting: faceAnalysis.isSquinting,
+            isConfused: faceAnalysis.isConfused
+          };
         });
 
         if (poseResults.landmarks && poseResults.landmarks.length > 0) {
           poseResults.landmarks.forEach((landmarks, index) => {
-            const personColor = colors[index % colors.length];
+            const personColor = colors[0];
 
             // Analyze Pose
             const poseData = analyzePose(landmarks);
@@ -237,6 +240,7 @@ function App() {
             // Find matching face
             let assignedEmotion = "Scanning...";
             let isSquinting = false;
+            let isConfused = false;
             let matchedFaceLandmarks = null;
             let matchedFaceId = null;
             let minDist = 0.2;
@@ -251,6 +255,7 @@ function App() {
                   minDist = dist;
                   assignedEmotion = face.emotion;
                   isSquinting = face.isSquinting;
+                  isConfused = face.isConfused;
                   matchedFaceLandmarks = faceResults.faceLandmarks[face.id];
                   matchedFaceId = face.id;
                 }
@@ -266,9 +271,10 @@ function App() {
               isWearingSpecs = specsResultsRef.current[matchedFaceId];
             }
 
+            let minX = 1, minY = 1, maxX = 0, maxY = 0;
+
             if (matchedFaceLandmarks) {
               const cropCtx = cropCanvasRef.current.getContext('2d');
-              let minX = 1, minY = 1, maxX = 0, maxY = 0;
               matchedFaceLandmarks.forEach(l => {
                 if (l.x < minX) minX = l.x; if (l.y < minY) minY = l.y;
                 if (l.x > maxX) maxX = l.x; if (l.y > maxY) maxY = l.y;
@@ -290,8 +296,6 @@ function App() {
               if (specsClassifier && matchedFaceId !== null && (!lastClassifyTimeRef.current[matchedFaceId] || now - lastClassifyTimeRef.current[matchedFaceId] > 800)) {
                 lastClassifyTimeRef.current[matchedFaceId] = now;
                 const classificationResult = specsClassifier.classify(cropCanvasRef.current);
-                const topCategory = classificationResult.classifications[0].categories[0];
-                console.log(`[Specs Insight] Face ${matchedFaceId}: Top Guess = "${topCategory.categoryName}" (Conf: ${topCategory.score.toFixed(2)})`);
 
                 if (classificationResult && classificationResult.classifications && classificationResult.classifications.length > 0) {
                   isWearingSpecs = classificationResult.classifications[0].categories.some(cat =>
@@ -341,13 +345,8 @@ function App() {
               }
             }
 
-            // 1. Draw
-            drawingUtilsRef.current.drawLandmarks(landmarks, {
-            });
-            drawingUtilsRef.current.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-              color: personColor,
-              lineWidth: 4
-            });
+            // Calculate prominence score (Face Area)
+            const prominence = matchedFaceLandmarks ? (maxX - minX) * (maxY - minY) : 0;
 
             currentStats.push({
               id: index + 1,
@@ -355,15 +354,34 @@ function App() {
               ...poseData,
               emotion: assignedEmotion,
               isSquinting: isSquinting,
-              specs: isWearingSpecs
+              isConfused: isConfused,
+              specs: isWearingSpecs,
+              prominence: prominence,
+              landmarks: landmarks, // Store for drawing later
             });
           });
-          setDebugStatus(`Detecting: ${poseResults.landmarks.length} Person(s)`);
+
+          // Sort by prominence and pick the main person
+          currentStats.sort((a, b) => b.prominence - a.prominence);
+
+          const totalPeople = currentStats.length;
+          const mainPerson = currentStats.length > 0 ? currentStats[0] : null;
+
+          // Draw ONLY the main person's skeleton
+          if (mainPerson && drawingUtilsRef.current) {
+            drawingUtilsRef.current.drawLandmarks(mainPerson.landmarks);
+            drawingUtilsRef.current.drawConnectors(mainPerson.landmarks, PoseLandmarker.POSE_CONNECTIONS, {
+              color: mainPerson.color,
+              lineWidth: 4
+            });
+          }
+
+          setResultsDisplay(mainPerson ? [{ ...mainPerson, totalPeople }] : []);
+          setDebugStatus(totalPeople > 0 ? `Detecting: ${totalPeople} Person(s)` : "Looking for people...");
         } else {
+          setResultsDisplay([]);
           setDebugStatus("Looking for people...");
         }
-
-        setResultsDisplay(currentStats);
 
       } catch (err) {
         console.error("Prediction Error:", err);
@@ -429,7 +447,9 @@ function App() {
       <div className="overlay">
         {resultsDisplay.map((person) => (
           <div key={person.id} className="person-card" style={{ borderTop: `4px solid ${person.color}` }}>
-            <div className="person-title" style={{ color: person.color }}>Detected Person {person.id}</div>
+            <div className="person-title" style={{ color: person.color }}>
+              Main Subject
+            </div>
             <div className="status-row">
               <span className="label">Posture</span>
               <span className={`value ${person.posture.toLowerCase()}`}>{person.posture}</span>
@@ -456,6 +476,18 @@ function App() {
               <span className="label">Eye Strain</span>
               <span className="value" style={{ color: person.isSquinting ? '#f87171' : '#94a3b8' }}>
                 {person.isSquinting ? 'Strain Detected' : 'Comfortable'}
+              </span>
+            </div>
+            <div className="status-row">
+              <span className="label">Complexity</span>
+              <span className="value" style={{ color: person.isConfused ? '#fca5a5' : '#94a3b8' }}>
+                {person.isConfused ? 'Confusion Detected' : 'Clear'}
+              </span>
+            </div>
+            <div className="status-row">
+              <span className="label">Multi-Person</span>
+              <span className="value" style={{ color: person.totalPeople > 1 ? '#fca5a5' : '#94a3b8' }}>
+                {person.totalPeople > 1 ? 'Detected' : 'Not Detected'}
               </span>
             </div>
           </div>
