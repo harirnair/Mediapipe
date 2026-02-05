@@ -158,28 +158,136 @@ canvas {
   transform: scale(0.95);
 }
 
+/* Landing Screen Styles */
+.landing-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+  z-index: 60;
+  backdrop-filter: blur(20px);
+  animation: landingFadeIn 0.8s ease-out;
+}
+
+.landing-content {
+  text-align: center;
+  max-width: 800px;
+  padding: 40px;
+}
+
+.landing-title {
+  font-size: 3.2rem;
+  font-weight: 900;
+  background: linear-gradient(to right, #38bdf8, #818cf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+  animation: titleSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.landing-subtitle {
+  font-size: 1.25rem;
+  color: #94a3b8;
+  margin-bottom: 50px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: subtitleFadeIn 1s ease-out 0.3s both;
+}
+
+.landing-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  animation: buttonsSlideUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.5s both;
+}
+
 .start-button {
-  background: linear-gradient(135deg, #38bdf8 0%, #3182ce 100%);
-  color: white;
-  border: none;
-  padding: 18px 36px;
-  border-radius: 12px;
+  width: 400px;
+  /* Fixed width for consistency */
+  padding: 20px 40px;
   font-size: 1.25rem;
   font-weight: 700;
+  border: none;
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.4);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+}
+
+.intelligence-btn {
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.5);
+}
+
+.gesture-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  box-shadow: 0 10px 30px -10px rgba(79, 70, 229, 0.5);
 }
 
 .start-button:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 20px 25px -5px rgba(56, 189, 248, 0.5);
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
 }
 
 .start-button:active {
-  transform: scale(0.98);
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Animations */
+@keyframes landingFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes titleSlideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes subtitleFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes buttonsSlideUp {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .emotion-btn {
@@ -238,6 +346,7 @@ canvas {
 .mini-btn.unload:hover {
   background: #ef4444;
 }
+
 /* PIN Screen Styles */
 .pin-screen {
   position: absolute;
@@ -415,9 +524,12 @@ canvas {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
@@ -436,9 +548,11 @@ canvas {
   0% {
     transform: translate(-50%, -50%) scale(1);
   }
+
   50% {
     transform: translate(-50%, -50%) scale(1.5);
   }
+
   100% {
     transform: translate(-50%, -50%) scale(1);
   }
@@ -454,6 +568,7 @@ canvas {
   transform: translateY(-2px);
   box-shadow: 0 10px 20px rgba(0, 123, 255, 0.3);
 }
+
 /* PIN Mode Button */
 .pin-mode-button:hover {
   transform: translateY(-2px) scale(1.02);
@@ -464,6 +579,7 @@ canvas {
 .loading .start-button {
   min-width: 200px;
 }
+
 /* Enhanced PIN digit display */
 .pin-digit {
   transition: all 0.3s ease;
@@ -482,6 +598,7 @@ canvas {
     transform: scale(1.3);
     color: #22c55e;
   }
+
   100% {
     transform: scale(1);
     color: #38bdf8;
@@ -491,6 +608,7 @@ canvas {
 .pin-digit.entering {
   animation: digitEntry 0.3s ease-out;
 }
+
 /* ATM Screen Styles */
 .atm-screen {
   position: absolute;
@@ -722,9 +840,12 @@ canvas {
 }
 
 @keyframes successPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.1);
   }
@@ -811,6 +932,7 @@ canvas {
     transform: scale(0.8);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;

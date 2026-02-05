@@ -1183,31 +1183,30 @@ function App() {
       )}
 
       {!loading && currentScreen === 'landing' && (
-        <div className="loading" style={{ background: 'transparent', backdropFilter: 'blur(10px)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'center' }}>
-            <button
-              className="start-button"
-              onClick={() => {
-                setCurrentScreen('main');
-                if (!cameraActive) startCamera();
-              }}
-            >
-              Start System
-            </button>
-            <button
-              className="start-button pin-mode-button"
-              onClick={() => {
-                console.log("Entering Card mode - starting camera first");
-                setCurrentScreen('pin');
-                if (!cameraActive) startCamera();
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.4)'
-              }}
-            >
-              Enter Card Mode
-            </button>
+        <div className="landing-screen">
+          <div className="landing-content">
+            <h1 className="landing-title">Anticipatory Accessibility AI for ATMs & Kiosks</h1>
+            <div className="landing-buttons">
+              <button
+                className="start-button intelligence-btn"
+                onClick={() => {
+                  setCurrentScreen('main');
+                  if (!cameraActive) startCamera();
+                }}
+              >
+                Anticipation Intelligence
+              </button>
+              <button
+                className="start-button gesture-btn"
+                onClick={() => {
+                  console.log("Entering Gesture interaction mode - starting camera first");
+                  setCurrentScreen('pin');
+                  if (!cameraActive) startCamera();
+                }}
+              >
+                Gesture Interaction
+              </button>
+            </div>
           </div>
         </div>
       )}

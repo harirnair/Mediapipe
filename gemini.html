@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice ATM Demo</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --cyan: #0088dd;
+            --cyan-dim: rgba(0, 136, 221, .15);
+            --green: #7ed957;
+            --yellow: #ffd700;
+            --orange: #ff6633;
+            --red: #dd3333;
+            --bg-deep: #2a2a2a;
+            --bg-card: #1a1a1a;
+            --bg-screen: #0a0a0a;
+            --text: #e8e8e8;
+            --text-dim: #888888;
+            --metal-dark: #3a3a3a;
+            --metal-body: #4a4a4a;
+            --metal-light: #5a5a5a;
+            --key-beige: #e8e4d8;
+            --key-shadow: #c0bdb0;
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* ─── MAIN ATM CONTAINER ─── */
+        .atm-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            display: flex;
+            gap: 0;
+            background: linear-gradient(135deg, var(--metal-light) 0%, var(--metal-body) 50%, var(--metal-dark) 100%);
+            box-shadow:
+                inset 0 2px 4px rgba(255, 255, 255, .1),
+                inset 0 -2px 4px rgba(0, 0, 0, .3);
+            overflow: hidden;
+        }
+
+        /* ─── LEFT SECTION: SCREEN (70%) ─── */
+        .screen-section {
+            flex: 0 0 70%;
+            padding: 30px 25px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: linear-gradient(135deg, var(--metal-light) 0%, var(--metal-body) 100%);
+        }
+
+        /* Start button as small icon in corner */
+        .start-mic-icon {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #5a5a5a, #3a3a3a);
+            border: 2px solid var(--metal-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all .3s;
+            z-index: 10;
+            box-shadow:
+                0 3px 8px rgba(0, 0, 0, .5),
+                inset 0 1px 0 rgba(255, 255, 255, .15);
+        }
+
+        .start-mic-icon:hover {
+            transform: scale(1.08);
+            box-shadow:
+                0 4px 12px rgba(0, 0, 0, .6),
+                inset 0 1px 0 rgba(255, 255, 255, .15);
+        }
+
+        .start-mic-icon.listening {
+            border-color: var(--green);
+            background: linear-gradient(145deg, #8ef967, #6ed947);
+            animation: micPulse 1.5s infinite;
+        }
+
+        @keyframes micPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 3px 8px rgba(126, 217, 87, .5), inset 0 1px 0 rgba(255, 255, 255, .3);
+            }
+
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 6px 16px rgba(126, 217, 87, .7), inset 0 1px 0 rgba(255, 255, 255, .3);
+            }
+        }
+
+        /* Voice status badge */
+        .voice-badge {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(0, 0, 0, .4);
+            border-radius: 20px;
+            font-size: 12px;
+            color: #ccc;
+            font-family: 'Share Tech Mono', monospace;
+            border: 1px solid rgba(255, 255, 255, .1);
+        }
+
+        .voice-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+            transition: all .3s;
+        }
+
+        .voice-dot.on {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: blink 1.4s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .4
+            }
+        }
+
+        /* Metallic screen bezel */
+        .screen-bezel {
+            flex: 1;
+            background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+            border-radius: 4px;
+            padding: 16px;
+            box-shadow:
+                inset 0 3px 10px rgba(0, 0, 0, .6),
+                inset 0 -2px 6px rgba(255, 255, 255, .08),
+                0 4px 12px rgba(0, 0, 0, .5);
+            position: relative;
+            border: 2px solid #1a1a1a;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen-bezel::before {
+            content: '';
+            position: absolute;
+            inset: 6px;
+            border-radius: 2px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, .05), transparent);
+            pointer-events: none;
+        }
+
+        /* Actual display with glass glare effect */
+        .screen-display {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0f0f0f 0%, #050505 100%);
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, .8);
+            border: 1px solid #000;
+        }
+
+        /* Glass glare overlay */
+        .screen-display::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(120deg,
+                    transparent 0%,
+                    transparent 30%,
+                    rgba(255, 255, 255, .08) 40%,
+                    rgba(255, 255, 255, .15) 50%,
+                    rgba(255, 255, 255, .08) 60%,
+                    transparent 70%,
+                    transparent 100%);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Additional subtle reflection */
+        .screen-display::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40%;
+            background: linear-gradient(180deg, rgba(255, 255, 255, .06) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .atm-header {
+            padding: 14px 24px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            border-bottom: 2px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .atm-header .logo {
+            font-family: 'Poppins', sans-serif;
+            color: var(--cyan);
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(0, 136, 221, .5);
+        }
+
+        .header-datetime {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            color: #bbb;
+            text-align: right;
+        }
+
+        /* Transcript strip - moved inside screen at bottom left */
+        .transcript-strip {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, .7);
+            border-radius: 6px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            min-height: 40px;
+            border: 1px solid rgba(0, 136, 221, .3);
+            backdrop-filter: blur(5px);
+            z-index: 98;
+        }
+
+        .transcript-strip .label {
+            color: var(--cyan);
+            opacity: .9;
+            font-weight: 600;
+            text-shadow: 0 0 5px rgba(0, 136, 221, .5);
+        }
+
+        .transcript-strip .words {
+            color: #ccc;
+            flex: 1;
+        }
+
+        .transcript-strip .words.highlight {
+            color: var(--green);
+            font-weight: 600;
+            text-shadow: 0 0 5px rgba(126, 217, 87, .5);
+        }
+
+        /* Screen content wrapper */
+        .screen-wrap {
+            padding: 100px 25px 70px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+        }
+
+        .screen {
+            display: none;
+            width: 100%;
+            text-align: center;
+            animation: fadeUp .35s ease both;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Bank logo on welcome screen */
+        .bank-logo-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 24px 0 6px;
+        }
+
+        .bank-logo {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            padding: 14px;
+            background: linear-gradient(135deg, rgba(0, 136, 221, .12), rgba(126, 217, 87, .06));
+            box-shadow: 0 6px 18px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bank-logo svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .screen-title {
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--cyan);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: none;
+            margin: 12px 0 6px;
+            text-shadow: 0 0 10px rgba(0, 136, 221, .5);
+        }
+
+        .screen-sub {
+            color: #aaa;
+            font-size: 16px;
+            line-height: 1.6;
+            max-width: 450px;
+            margin: 0 auto 24px;
+        }
+
+        .screen-sub strong {
+            color: var(--cyan);
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(0, 136, 221, .4);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px 32px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #0099ee, #0077cc);
+            color: white;
+            font-family: 'Poppins', sans-serif;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            letter-spacing: .5px;
+            box-shadow:
+                0 3px 8px rgba(0, 0, 0, .4),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        .btn svg {
+            width: 18px;
+            height: 18px;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .large-icon {
+            width: 88px;
+            height: 88px;
+            margin: 12px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .large-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .start-mic-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(180deg, #00aaff, #0088dd);
+            transform: translateY(-2px);
+            box-shadow:
+                0 5px 12px rgba(0, 136, 221, .4),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        .btn.green {
+            background: linear-gradient(180deg, #8ef967, #6ed947);
+        }
+
+        .btn.green:hover {
+            background: linear-gradient(180deg, #9efa77, #7ee957);
+        }
+
+        .btn.red {
+            background: linear-gradient(180deg, #ee5555, #cc3333);
+        }
+
+        .btn.red:hover {
+            background: linear-gradient(180deg, #ff6666, #dd4444);
+        }
+
+        /* Card slot (simplified for screen) */
+        .card-slot {
+            width: 240px;
+            height: 56px;
+            border: 2px dashed rgba(0, 136, 221, .5);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin: 16px 0;
+            position: relative;
+            overflow: hidden;
+            background: rgba(0, 0, 0, .3);
+        }
+
+        .card-slot .card-anim {
+            position: absolute;
+            width: 75px;
+            height: 48px;
+            background: linear-gradient(135deg, #c9a227, #f0d060, #c9a227);
+            border-radius: 6px;
+            left: -90px;
+            top: 4px;
+            transition: left .6s cubic-bezier(.2, .8, .3, 1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+        }
+
+        .card-slot.inserting .card-anim {
+            left: 83px;
+        }
+
+        /* PIN display */
+        .pin-display {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 36px;
+            letter-spacing: 16px;
+            color: var(--cyan);
+            min-height: 48px;
+            margin-bottom: 24px;
+            font-weight: 600;
+            text-shadow: 0 0 10px rgba(0, 136, 221, .5);
+        }
+
+        /* Amount grid */
+        .amt-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 200px);
+            gap: 16px;
+            margin: 20px auto;
+        }
+
+        .amt-btn {
+            padding: 20px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #0099ee, #0077cc);
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .2s;
+            box-shadow:
+                0 3px 8px rgba(0, 0, 0, .4),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        .amt-btn:hover {
+            background: linear-gradient(180deg, #00aaff, #0088dd);
+            transform: translateY(-2px);
+            box-shadow:
+                0 5px 12px rgba(0, 136, 221, .4),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #333;
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 24px auto;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Receipt */
+        .receipt {
+            background: white;
+            color: #1a1a1a;
+            padding: 24px;
+            border-radius: 4px;
+            max-width: 340px;
+            margin: 0 auto;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, .6);
+            border: 1px solid #ddd;
+        }
+
+        .receipt .r-title {
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+
+        .receipt .r-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #ccc;
+        }
+
+        .receipt .r-row:last-child {
+            border: none;
+        }
+
+        .receipt .r-label {
+            color: #666;
+        }
+
+        .receipt .r-val {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        /* Balance display */
+        .balance-num {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 52px;
+            color: var(--green);
+            margin: 24px 0;
+            letter-spacing: 2px;
+            font-weight: 700;
+            text-shadow: 0 0 15px rgba(126, 217, 87, .6);
+        }
+
+        /* ─── RIGHT SECTION: HARDWARE (30%) ─── */
+        .hardware-section {
+            flex: 0 0 30%;
+            background: linear-gradient(135deg, var(--metal-light) 0%, var(--metal-body) 100%);
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-left: 3px solid var(--metal-dark);
+            overflow-y: auto;
+        }
+
+        /* Card inserter */
+        .card-inserter {
+            background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow:
+                inset 0 3px 8px rgba(0, 0, 0, .6),
+                inset 0 -2px 4px rgba(255, 255, 255, .08);
+            border: 2px solid #1a1a1a;
+        }
+
+        .card-inserter-label {
+            font-size: 9px;
+            color: #ccc;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-slot-hw {
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+            border-radius: 4px;
+            border: 2px solid #000;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, .9);
+            margin-bottom: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-slot-hw::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            right: 10px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, rgba(126, 217, 87, .5), transparent);
+            transform: translateY(-50%);
+        }
+
+        .card-slot-hw::after {
+            content: '';
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 2px;
+            background: rgba(126, 217, 87, .4);
+        }
+
+        .insert-card-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(180deg, #0099ee, #0077cc);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all .2s;
+            box-shadow:
+                0 3px 8px rgba(0, 0, 0, .5),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        .insert-card-btn:hover {
+            background: linear-gradient(180deg, #00aaff, #0088dd);
+            transform: translateY(-2px);
+            box-shadow:
+                0 5px 12px rgba(0, 136, 221, .5),
+                inset 0 1px 0 rgba(255, 255, 255, .3);
+        }
+
+        .insert-card-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Receipt printer slot */
+        .receipt-slot {
+            background: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+            border-radius: 8px;
+            padding: 14px;
+            box-shadow:
+                inset 0 3px 8px rgba(0, 0, 0, .6),
+                inset 0 -2px 4px rgba(255, 255, 255, .08);
+            border: 2px solid #1a1a1a;
+        }
+
+        .receipt-slot-opening {
+            width: 100%;
+            height: 32px;
+            background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+            border-radius: 4px;
+            border: 2px solid #000;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, .9);
+            position: relative;
+        }
+
+        .receipt-slot-opening::before {
+            content: '';
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70%;
+            height: 2px;
+            background: rgba(255, 255, 255, .05);
+        }
+
+        /* 3D Keypad - 4x4 grid like reference */
+        .keypad-container {
+            background: linear-gradient(145deg, #5a5a5a, #3a3a3a);
+            border-radius: 12px;
+            padding: 16px 12px;
+            box-shadow:
+                inset 0 3px 8px rgba(0, 0, 0, .4),
+                inset 0 -2px 4px rgba(255, 255, 255, .1);
+            border: 2px solid #2a2a2a;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .keypad-label {
+            font-size: 9px;
+            color: #ccc;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            flex: 1;
+        }
+
+        .keypad .k {
+            border-radius: 6px;
+            background: linear-gradient(145deg, #5a5a5a, #3a3a3a);
+            border: 1px solid #2a2a2a;
+            color: #e8e8e8;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .15s;
+            box-shadow:
+                0 3px 6px rgba(0, 0, 0, .4),
+                inset 0 1px 0 rgba(255, 255, 255, .15),
+                inset 0 -1px 0 rgba(0, 0, 0, .3);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            min-height: 0;
+        }
+
+        .keypad .k:hover {
+            background: linear-gradient(145deg, #6a6a6a, #4a4a4a);
+            transform: translateY(-2px);
+            box-shadow:
+                0 5px 10px rgba(0, 0, 0, .5),
+                inset 0 1px 0 rgba(255, 255, 255, .2),
+                inset 0 -1px 0 rgba(0, 0, 0, .3);
+        }
+
+        .keypad .k:active {
+            transform: translateY(1px);
+            box-shadow:
+                0 2px 4px rgba(0, 0, 0, .3),
+                inset 0 1px 2px rgba(0, 0, 0, .3);
+        }
+
+        .keypad .k .num {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .keypad .k .letters {
+            font-size: 7px;
+            color: #999;
+            letter-spacing: 0.5px;
+        }
+
+        /* Braille dots */
+        .keypad .k .braille {
+            position: absolute;
+            bottom: 4px;
+            display: flex;
+            gap: 2px;
+            opacity: .4;
+        }
+
+        .keypad .k .braille span {
+            width: 2px;
+            height: 2px;
+            background: #aaa;
+            border-radius: 50%;
+        }
+
+        .keypad .k.rect {
+            border-radius: 10px;
+        }
+
+        .keypad .k.orange {
+            background: linear-gradient(145deg, #ff8855, #ee6633);
+            color: white;
+            font-size: 14px;
+        }
+
+        .keypad .k.orange:hover {
+            background: linear-gradient(145deg, #ff9966, #ff7744);
+        }
+
+        .keypad .k.yellow {
+            background: linear-gradient(145deg, #ffee44, #ffdd22);
+            color: #444;
+            font-size: 14px;
+        }
+
+        .keypad .k.yellow:hover {
+            background: linear-gradient(145deg, #ffff55, #ffee33);
+        }
+
+        .keypad .k.green {
+            background: linear-gradient(145deg, #88ee66, #66cc44);
+            color: white;
+            font-size: 14px;
+        }
+
+        .keypad .k.green:hover {
+            background: linear-gradient(145deg, #99ff77, #77dd55);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1200px) {
+            .atm-container {
+                flex-direction: column;
+            }
+
+            .screen-section,
+            .hardware-section {
+                flex: 1;
+            }
+
+            .hardware-section {
+                border-left: none;
+                border-top: 2px solid rgba(0, 0, 0, .3);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="atm-container">
+        <!-- ═══════════ LEFT: SCREEN SECTION (70%) ═══════════ -->
+        <div class="screen-section">
+            <!-- Start mic button in corner -->
+            <button class="start-mic-icon" id="micBtn" onclick="startMic()" title="Start Voice Control"
+                aria-label="Start Voice Control">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                    <path fill="#fff" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"></path>
+                    <path fill="#fff"
+                        d="M19 11a1 1 0 0 0-2 0 5 5 0 0 1-10 0 1 1 0 0 0-2 0 5 5 0 0 0 4 4.9V20h-3a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-4.1A5 5 0 0 0 19 11z">
+                    </path>
+                </svg>
+            </button>
+
+            <!-- Voice status badge -->
+            <div class="voice-badge">
+                <div class="voice-dot" id="voiceDot"></div>
+                <span id="voiceStatus">IDLE</span>
+            </div>
+
+            <!-- Metallic screen bezel -->
+            <div class="screen-bezel">
+                <div class="screen-display">
+                    <div class="atm-header">
+                        <div class="logo">ANTICIPATIVE ATM</div>
+                        <div class="header-datetime" id="headerDateTime">--</div>
+                    </div>
+
+                    <div class="screen-wrap">
+                        <!-- WELCOME SCREEN -->
+                        <div class="screen active" id="s-welcome">
+                            <div class="bank-logo-wrap">
+                                <div class="bank-logo" aria-hidden="true">
+                                    <!-- simple inline bank SVG logo -->
+                                    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                        focusable="false">
+                                        <circle cx="32" cy="32" r="30" fill="#0088dd" />
+                                        <path d="M10 24 L32 8 L54 24" stroke="#fff" stroke-width="3" fill="none"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                        <rect x="14" y="28" width="36" height="16" fill="#fff" rx="2" />
+                                        <rect x="18" y="32" width="4" height="8" fill="#0088dd" />
+                                        <rect x="28" y="32" width="4" height="8" fill="#0088dd" />
+                                        <rect x="38" y="32" width="4" height="8" fill="#0088dd" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="screen-title">Welcome</div>
+                            <div class="screen-sub">Say <strong>"Hello"</strong> to begin your transaction</div>
+                        </div>
+
+                        <!-- INSERT CARD -->
+                        <div class="screen" id="s-insert">
+                            <div class="screen-title">Insert Card</div>
+                            <div class="screen-sub">Please insert your card or say <strong>"insert card"</strong></div>
+                            <div class="card-slot" id="cardSlot">
+                                <div class="card-anim"></div>
+                                <span>INSERT CARD</span>
+                            </div>
+                        </div>
+
+                        <!-- PIN ENTRY -->
+                        <div class="screen" id="s-pin">
+                            <div class="screen-title">Enter PIN</div>
+                            <div class="screen-sub">Enter your 4-digit PIN or say digits aloud</div>
+                            <div class="pin-display" id="pinDisplay">••••</div>
+                            <div style="display:flex; gap:12px; margin-top:20px;">
+                                <button class="btn green" onclick="pin('enter')">✓ Verify</button>
+                                <button class="btn red" onclick="pin('clear')">← Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- MENU -->
+                        <div class="screen" id="s-menu">
+                            <div class="screen-title">Main Menu</div>
+                            <div class="screen-sub">What would you like to do today?</div>
+                            <div style="display:flex; gap:16px; margin-top:28px;">
+                                <button class="btn" onclick="goWithdraw()">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path fill="currentColor"
+                                            d="M21 8V7l-3 2-2-2-2 1-2-1-2 1-2-1-3 2v1l3-1v6a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3V7z" />
+                                    </svg>
+                                    Withdraw Cash
+                                </button>
+                                <button class="btn" onclick="goBalance()">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path fill="currentColor"
+                                            d="M12 2L2 7l10 5 10-5-10-5zm0 7.2L6 7.1v5.6c0 2.8 1.9 5.4 6 6.6 4.1-1.2 6-3.8 6-6.6V7.1l-6 2.1z" />
+                                    </svg>
+                                    Check Balance
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- AMOUNT SELECTION -->
+                        <div class="screen" id="s-amount">
+                            <div class="screen-title">Select Amount</div>
+                            <div class="screen-sub">Choose or say an amount to withdraw</div>
+                            <div class="amt-grid">
+                                <button class="amt-btn" onclick="pickAmt(500)">₹500</button>
+                                <button class="amt-btn" onclick="pickAmt(1000)">₹1,000</button>
+                                <button class="amt-btn" onclick="pickAmt(2000)">₹2,000</button>
+                                <button class="amt-btn" onclick="pickAmt(5000)">₹5,000</button>
+                            </div>
+                        </div>
+
+                        <!-- CONFIRM -->
+                        <div class="screen" id="s-confirm">
+                            <div class="screen-title">Confirm Amount</div>
+                            <div class="screen-sub">You are about to withdraw:</div>
+                            <div style="font-size: 52px; color: var(--cyan); margin: 24px 0; font-family: 'Share Tech Mono', monospace;"
+                                id="confirmAmt">₹1,000</div>
+                            <div style="display:flex; gap:16px;">
+                                <button class="btn green" onclick="goProcessing()">✓ Confirm</button>
+                                <button class="btn red" onclick="goAmount()">✗ Change</button>
+                            </div>
+                        </div>
+
+                        <!-- PROCESSING -->
+                        <div class="screen" id="s-processing">
+                            <div class="screen-title">Processing</div>
+                            <div class="screen-sub">Please wait while we process your transaction...</div>
+                            <div class="spinner"></div>
+                        </div>
+
+                        <!-- COLLECT CASH -->
+                        <div class="screen" id="s-collect">
+                            <div class="screen-title">Collect Cash</div>
+                            <div class="screen-sub">Your cash is ready! Please collect it from the dispenser.</div>
+                            <div class="large-icon" aria-hidden="true">
+                                <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                    focusable="false">
+                                    <rect x="6" y="18" width="52" height="28" rx="4" fill="#ffd54f" />
+                                    <rect x="10" y="22" width="44" height="12" fill="#fff" />
+                                    <path d="M18 36h28v4H18z" fill="#d1a21a" />
+                                    <circle cx="46" cy="28" r="3" fill="#d1a21a" />
+                                </svg>
+                            </div>
+                            <div class="screen-sub">Would you like a receipt?</div>
+                            <div style="display:flex; gap:16px; margin-top:20px;">
+                                <button class="btn green" onclick="goReceipt()">Yes, Print</button>
+                                <button class="btn" onclick="goEnd()">No, Thanks</button>
+                            </div>
+                        </div>
+
+                        <!-- RECEIPT -->
+                        <div class="screen" id="s-receipt">
+                            <div class="screen-title">Receipt</div>
+                            <div class="receipt">
+                                <div class="r-title">TRANSACTION RECEIPT</div>
+                                <div class="r-row">
+                                    <span class="r-label">Date:</span>
+                                    <span class="r-val" id="r-date">--</span>
+                                </div>
+                                <div class="r-row">
+                                    <span class="r-label">Time:</span>
+                                    <span class="r-val" id="r-time">--</span>
+                                </div>
+                                <div class="r-row">
+                                    <span class="r-label">Type:</span>
+                                    <span class="r-val">Withdrawal</span>
+                                </div>
+                                <div class="r-row">
+                                    <span class="r-label">Amount:</span>
+                                    <span class="r-val" id="r-amt">₹0</span>
+                                </div>
+                                <div class="r-row">
+                                    <span class="r-label">Balance:</span>
+                                    <span class="r-val" id="r-bal">₹0</span>
+                                </div>
+                            </div>
+                            <button class="btn" onclick="goEnd()" style="margin-top:24px;">Done</button>
+                        </div>
+
+                        <!-- BALANCE -->
+                        <div class="screen" id="s-balance">
+                            <div class="screen-title">Account Balance</div>
+                            <div class="screen-sub">Your available balance is:</div>
+                            <div class="balance-num" id="balNum">₹0.00</div>
+                            <div style="display:flex; gap:16px; margin-top:20px;">
+                                <button class="btn" onclick="goMenu()">← Main Menu</button>
+                                <button class="btn red" onclick="goEnd()">Exit</button>
+                            </div>
+                        </div>
+
+                        <!-- END -->
+                        <div class="screen" id="s-end">
+                            <div class="screen-title">Thank You</div>
+                            <div class="screen-sub">Please collect your card and receipt.<br>Have a great day!</div>
+                            <div class="large-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+                                    focusable="false">
+                                    <path fill="#ffd54f"
+                                        d="M12 2l1.9 4.4L18.6 8 14 11l1 4.6L12 13l-3 2.6L10 11 5.4 8l4.7-1.6L12 2z" />
+                                </svg>
+                            </div>
+                            <button class="btn" onclick="goWelcome()">Start New Transaction</button>
+                        </div>
+
+                    </div>
+
+                    <!-- Transcript strip inside screen at bottom -->
+                    <div class="transcript-strip">
+                        <span class="label">YOU:</span>
+                        <span class="words" id="transcriptWords">— listening —</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════ RIGHT: HARDWARE SECTION (30%) ═══════════ -->
+        <div class="hardware-section">
+            <!-- Card Inserter -->
+            <div class="card-inserter">
+                <div class="card-inserter-label">Card Reader</div>
+                <div class="card-slot-hw"></div>
+                <button class="insert-card-btn" onclick="doCardInsert()">Insert Card</button>
+            </div>
+
+            <!-- Receipt Printer -->
+            <div class="receipt-slot">
+                <div class="receipt-slot-opening"></div>
+            </div>
+
+            <!-- 3D Keypad -->
+            <div class="keypad-container">
+                <div class="keypad-label">Number Pad</div>
+                <div class="keypad">
+                    <button class="k" onclick="pin('1')">
+                        <span class="num">1</span>
+                        <div class="braille"><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('2')">
+                        <span class="num">2</span>
+                        <span class="letters">ABC</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('3')">
+                        <span class="num">3</span>
+                        <span class="letters">DEF</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k orange rect" onclick="pin('clear')">
+                        <span style="font-size: 16px;">✕<br><span style="font-size: 11px;">Cancel</span></span>
+                    </button>
+
+                    <button class="k" onclick="pin('4')">
+                        <span class="num">4</span>
+                        <span class="letters">GHI</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('5')">
+                        <span class="num">5</span>
+                        <span class="letters">JKL</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('6')">
+                        <span class="num">6</span>
+                        <span class="letters">MNO</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k yellow rect" onclick="pin('clear')">
+                        <span style="font-size: 16px;">⟵<br><span style="font-size: 11px;">Correct</span></span>
+                    </button>
+
+                    <button class="k" onclick="pin('7')">
+                        <span class="num">7</span>
+                        <span class="letters">PQRS</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('8')">
+                        <span class="num">8</span>
+                        <span class="letters">TUV</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k" onclick="pin('9')">
+                        <span class="num">9</span>
+                        <span class="letters">WXYZ</span>
+                        <div class="braille"><span></span><span></span></div>
+                    </button>
+                    <button class="k green rect" onclick="pin('enter')">
+                        <span style="font-size: 16px;">✓<br><span style="font-size: 11px;">Confirm</span></span>
+                    </button>
+
+                    <button class="k">
+                        <span class="num">*</span>
+                    </button>
+                    <button class="k" onclick="pin('0')">
+                        <span class="num">0</span>
+                        <div class="braille"><span></span></div>
+                    </button>
+                    <button class="k">
+                        <span class="num">#</span>
+                    </button>
+                    <button class="k rect" style="background: linear-gradient(145deg, #f0ebe0, #d8d4c8); color: #999;">
+                        <span style="font-size: 28px;">⌂</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════ CONFIG ═══════════════════════════════════
+        const BALANCE = 25000;
+        let currentScreen = 's-welcome';
+        let pinVal = '';
+        let chosenAmt = 1000;
+        let micActive = false;
+        let isSpeaking = false;
+        let lastIgnoredIndex = -1; // Track the index of the last speech we ignored
+
+        // ─── SPEECH RECOGNITION (Web Speech API) ──────────────
+        const recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+            ? new (window.SpeechRecognition || window.webkitSpeechRecognition)()
+            : null;
+
+        if (recognition) {
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-IN';
+        }
+
+        // ─── TEXT-TO-SPEECH (Web Speech Synthesis) ────────────
+        function speak(text, onEnd) {
+            if (!window.speechSynthesis) return;
+
+            // Cancel any pending speech to ensure single-voice focus
+            window.speechSynthesis.cancel();
+            isSpeaking = true;
+
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'en-IN';
+            u.rate = 1.0;
+            u.pitch = 1.0;
+            u.onend = () => {
+                isSpeaking = false;
+                if (onEnd) onEnd();
+                // Ensure mic restarts after we finish talking if it's supposed to be active
+                if (micActive) safeStart();
+            };
+            u.onerror = (e) => {
+                console.error('TTS Error:', e);
+                isSpeaking = false;
+                if (micActive) safeStart();
+            };
+            window.speechSynthesis.speak(u);
+        }
+
+        // ─── SCREEN NAVIGATION ─────────────────────────────────
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            currentScreen = id;
+        }
+
+        function setVoiceDot(active, status) {
+            const dot = document.getElementById('voiceDot');
+            const txt = document.getElementById('voiceStatus');
+            dot.classList.toggle('on', active);
+            txt.textContent = status || (active ? 'LISTENING' : 'IDLE');
+        }
+
+        // ─── START VOICE CONTROL ───────────────────────────────
+        function startMic() {
+            if (!recognition) {
+                alert('Speech recognition not supported in this browser.');
+                return;
+            }
+            if (micActive) return;
+
+            recognition.onresult = (e) => {
+                const current = e.resultIndex;
+
+                // Soft Mute: Ignore input while we are speaking
+                if (isSpeaking) {
+                    console.log('[SoftMute] Ignored input during TTS (idx=' + current + '):', e.results[e.results.length - 1][0].transcript);
+                    lastIgnoredIndex = current;
+                    return;
+                }
+
+                // Also ignore if this result index belongs to a phrase that started while talking
+                if (current <= lastIgnoredIndex) {
+                    console.log('[SoftMute] Ignoring trailing input (idx=' + current + ')');
+                    return;
+                }
+
+                let final = '', interim = '';
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    if (e.results[i].isFinal) final += e.results[i][0].transcript;
+                    else interim += e.results[i][0].transcript;
+                }
+                const txt = (final || interim).trim().toLowerCase();
+                const el = document.getElementById('transcriptWords');
+                el.textContent = txt || '— listening —';
+                el.classList.toggle('highlight', !!txt);
+
+                if (final) handleVoice(final.trim().toLowerCase());
+            };
+
+            let networkRetryActive = false;
+            let consecutiveErrors = 0;
+
+            recognition.onerror = (e) => {
+                console.warn('[STT] Error:', e.error);
+                if (e.error === 'no-speech' || e.error === 'aborted') return;
+
+                consecutiveErrors++;
+
+                if (e.error === 'network') {
+                    setVoiceDot(false, 'NETWORK ERROR');
+                    networkRetryActive = true;
+
+                    if (consecutiveErrors > 5) {
+                        console.error('[STT] Persistent network issues limit reached. Stopping auto-restart.');
+                        setVoiceDot(false, 'OFFLINE');
+                        micActive = false;
+                        document.getElementById('micBtn').classList.remove('listening');
+                        return;
+                    }
+
+                    // Retry after 3 seconds on network failure to avoid flooding
+                    console.log('[STT] Network error. Scheduling retry in 3s...');
+                    setTimeout(() => {
+                        networkRetryActive = false;
+                        if (micActive) safeStart('Network Recovery');
+                    }, 3000);
+                    return;
+                }
+
+                if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                    setVoiceDot(false, 'MIC BLOCKED');
+                    micActive = false;
+                    document.getElementById('micBtn').classList.remove('listening');
+                    return;
+                }
+
+                setVoiceDot(false, 'ERROR: ' + e.error.toUpperCase());
+            };
+
+            recognition.onend = () => {
+                console.log('[STT] Session ended. micActive:', micActive, 'isSpeaking:', isSpeaking, 'retryActive:', networkRetryActive);
+
+                // If we are still in micActive mode, restart the recognition
+                // unless we are speaking or already doing a network retry
+                if (micActive && !isSpeaking && !networkRetryActive) {
+                    setTimeout(() => {
+                        if (micActive && !isSpeaking && !networkRetryActive) {
+                            safeStart('Session Refresh');
+                        }
+                    }, 600);
+                } else if (!micActive) {
+                    setVoiceDot(false, 'IDLE');
+                    document.getElementById('micBtn').classList.remove('listening');
+                }
+            };
+
+            recognition.onstart = () => {
+                consecutiveErrors = 0;
+                setVoiceDot(true, 'LISTENING');
+            };
+
+            micActive = true;
+            document.getElementById('micBtn').classList.add('listening');
+            setVoiceDot(true, 'LISTENING');
+            safeStart('Manual Initial');
+
+            speak('Welcome to Our ATM, Please Say "Hello ATM" if you require voice assistance', () => { });
+        }
+
+        let restartTimer = null;
+        function safeStart(reason = 'Unknown') {
+            if (!recognition || !micActive) return;
+
+            if (restartTimer) clearTimeout(restartTimer);
+
+            try {
+                recognition.start();
+                console.log('[STT] Starting. Source:', reason);
+            } catch (e) {
+                if (e.name === 'InvalidStateError') {
+                    // Recognition already running
+                } else {
+                    console.error('[STT] Failed to start:', e);
+                }
+            }
+        }
+
+        // ─── VOICE KEYWORD HANDLER ─────────────────────────────
+        function contains(txt, words) {
+            return words.some(w => txt.includes(w));
+        }
+
+        function handleVoice(txt) {
+            if (isSpeaking) return;
+
+            console.log('[voice]', txt, ' @ screen:', currentScreen);
+
+            switch (currentScreen) {
+                case 's-welcome':
+                    if (contains(txt, ['hello', 'hi', 'hey', 'start'])) {
+                        showScreen('s-insert');
+                        speak('Welcome to Voice ATM! Please insert your card or tap your phone to continue.');
+                    }
+                    break;
+
+                case 's-insert':
+                    if (contains(txt, ['card', 'insert', 'inserted', 'tap', 'phone'])) doCardInsert();
+                    break;
+
+                case 's-pin':
+                    if (contains(txt, ['verify', 'enter', 'done', 'ok', 'pass', 'skip'])) pin('enter');
+                    else {
+                        const digitMap = {
+                            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+                            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+                        };
+                        const tokens = txt.split(/\s+/);
+                        let digits = '';
+                        tokens.forEach(t => { if (digitMap[t]) digits += digitMap[t]; });
+                        if (digits.length >= 1) {
+                            digits.split('').forEach(d => pin(d));
+                            if (digits.length >= 4) pin('enter');
+                        }
+                    }
+                    break;
+
+                case 's-menu':
+                    if (contains(txt, ['withdraw', 'cash', 'money', 'take'])) goWithdraw();
+                    else if (contains(txt, ['balance', 'check', 'enquiry', 'inquiry', 'how much'])) goBalance();
+                    break;
+
+                case 's-amount':
+                    if (contains(txt, ['five hundred', '500'])) pickAmt(500);
+                    else if (contains(txt, ['one thousand', '1000', '1,000'])) pickAmt(1000);
+                    else if (contains(txt, ['two thousand', '2000', '2,000'])) pickAmt(2000);
+                    else if (contains(txt, ['five thousand', '5000', '5,000'])) pickAmt(5000);
+                    else {
+                        const num = extractNumber(txt);
+                        if (num && num > 0 && num <= 50000) pickAmt(num);
+                    }
+                    break;
+
+                case 's-confirm':
+                    if (contains(txt, ['confirm', 'yes', 'ok', 'proceed', 'go'])) goProcessing();
+                    else if (contains(txt, ['change', 'no', 'cancel', 'back'])) goAmount();
+                    break;
+
+                case 's-collect':
+                    if (contains(txt, ['receipt', 'yes', 'print'])) goReceipt();
+                    else if (contains(txt, ['no', 'skip', 'done', 'finish'])) goEnd();
+                    break;
+
+                case 's-receipt':
+                    if (contains(txt, ['done', 'ok', 'finish', 'end', 'exit'])) goEnd();
+                    break;
+
+                case 's-balance':
+                    if (contains(txt, ['menu', 'back', 'main'])) goMenu();
+                    else if (contains(txt, ['exit', 'done', 'end', 'bye', 'finish'])) goEnd();
+                    break;
+
+                case 's-end':
+                    if (contains(txt, ['new', 'start', 'again', 'hello'])) goWelcome();
+                    break;
+            }
+        }
+
+        function extractNumber(txt) {
+            const m = txt.match(/\d+/);
+            if (m) return parseInt(m[0]);
+            const map = {
+                'hundred': 100, 'thousand': 1000,
+                'five hundred': 500, 'one thousand': 1000, 'two thousand': 2000,
+                'three thousand': 3000, 'four thousand': 4000, 'five thousand': 5000,
+                'ten thousand': 10000
+            };
+            for (const [phrase, val] of Object.entries(map)) {
+                if (txt.includes(phrase)) return val;
+            }
+            return null;
+        }
+
+        // ═══════════ SCREEN ACTIONS ════════════════════════════
+
+        function goWelcome() {
+            pinVal = ''; chosenAmt = 1000;
+            showScreen('s-welcome');
+            setVoiceDot(false, 'IDLE');
+            document.getElementById('transcriptWords').textContent = '— listening —';
+            document.getElementById('transcriptWords').classList.remove('highlight');
+            if (micActive) setVoiceDot(true, 'LISTENING');
+        }
+
+        function doCardInsert() {
+            const slot = document.getElementById('cardSlot');
+            slot.classList.add('inserting');
+            setTimeout(() => {
+                slot.classList.remove('inserting');
+                showScreen('s-pin');
+                speak('Card accepted. Please enter your PIN, or say "verify" to continue.');
+            }, 700);
+        }
+
+        function pin(v) {
+            if (v === 'clear') { pinVal = pinVal.slice(0, -1); }
+            else if (v === 'enter') {
+                if (pinVal.length === 0) {
+                    showScreen('s-menu');
+                    speak('PIN verified. Welcome! What would you like to do today? You can withdraw cash or check your balance.');
+                    return;
+                }
+                if (pinVal.length >= 4) {
+                    showScreen('s-menu');
+                    speak('PIN verified. Welcome! What would you like to do today? You can withdraw cash or check your balance.');
+                    return;
+                }
+                return;
+            }
+            else if ('0123456789'.includes(v) && pinVal.length < 4) {
+                pinVal += v;
+            }
+            document.getElementById('pinDisplay').textContent = '•'.repeat(pinVal.length) || '••••';
+        }
+
+        function goMenu() { showScreen('s-menu'); speak('What would you like to do? You can withdraw cash or check your balance.'); }
+
+        function goWithdraw() { goAmount(); speak('Sure! How much would you like to withdraw? You can say an amount or tap one of the options.'); }
+        function goAmount() { showScreen('s-amount'); }
+
+        function pickAmt(amt) {
+            chosenAmt = amt;
+            document.getElementById('confirmAmt').textContent = '₹' + amt.toLocaleString();
+            showScreen('s-confirm');
+            speak('Are you sure you want to withdraw ₹' + amt + '? Say confirm or change.');
+        }
+
+        function goProcessing() {
+            showScreen('s-processing');
+            speak('Processing your transaction. Please wait.');
+            setTimeout(() => {
+                showScreen('s-collect');
+                speak('Your cash is ready. Please collect it. Would you like a receipt?');
+            }, 2800);
+        }
+
+        function goReceipt() {
+            showScreen('s-receipt');
+            const now = new Date();
+            document.getElementById('r-date').textContent = now.toLocaleDateString('en-IN');
+            document.getElementById('r-time').textContent = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('r-amt').textContent = '₹' + chosenAmt.toLocaleString();
+            const rem = BALANCE - chosenAmt;
+            document.getElementById('r-bal').textContent = '₹' + rem.toLocaleString();
+            speak('Here is your receipt. Thank you for using Voice ATM.');
+        }
+
+        function goBalance() {
+            showScreen('s-balance');
+            document.getElementById('balNum').textContent = '₹' + BALANCE.toLocaleString() + '.00';
+            speak('Your available balance is ₹' + BALANCE + '. You can go back to the main menu or exit.');
+        }
+
+        function goEnd() {
+            showScreen('s-end');
+            speak('Please collect your card. Thank you for using Voice ATM. Have a great day!', () => {
+                setVoiceDot(false, 'SESSION END');
+            });
+        }
+
+        window.speechSynthesis.onvoiceschanged = () => {
+            const v = window.speechSynthesis.getVoices();
+            console.log('[TTS] voices loaded:', v.length);
+        };
+
+        // Update header date/time every second so it's visible across screens
+        function updateHeaderDateTime() {
+            const el = document.getElementById('headerDateTime');
+            if (!el) return;
+            const now = new Date();
+            const date = now.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+            const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            el.textContent = `${date} • ${time}`;
+        }
+        updateHeaderDateTime();
+        setInterval(updateHeaderDateTime, 1000);
+    </script>
+</body>
+
+</html>
