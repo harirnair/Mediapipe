@@ -1206,6 +1206,12 @@ function App() {
               >
                 Gesture Interaction
               </button>
+              <button
+                className="start-button audio-btn"
+                onClick={() => window.open('./gemini.html', '_blank')}
+              >
+                Audio Interaction
+              </button>
             </div>
           </div>
         </div>
